@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+
+  tictactoe-service:
+    image: tictactoe-backend
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - "8080:80"
+
+  mongodb:
+    image: mongo
+    restart: always
+    command: mongod
+    ports:
+      - "27017:27017"
