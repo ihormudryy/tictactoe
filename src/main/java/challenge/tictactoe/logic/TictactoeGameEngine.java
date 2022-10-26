@@ -73,8 +73,8 @@ public class TictactoeGameEngine {
      * @param game
      * @param moves
      */
-    public void generateAndProcessNextMove(GameEntity game,
-                                           List<MoveEntity> moves) {
+    public void processAndGenerareteNextMove(GameEntity game,
+                                             List<MoveEntity> moves) {
         processMove(game, moves, true);
     }
 

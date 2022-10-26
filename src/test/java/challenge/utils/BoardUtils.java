@@ -45,7 +45,7 @@ public class BoardUtils {
                                                 int x, int y) {
         moves.add(createMove(x, y));
         long start = System.nanoTime();
-        engine.generateAndProcessNextMove(game, moves);
+        engine.processAndGenerareteNextMove(game, moves);
         long finish = System.nanoTime();
         return finish - start;
     }
@@ -55,7 +55,7 @@ public class BoardUtils {
                                                      TictactoeGameEngine engine,
                                                      int x, int y) {
         moves.add(createMove(x, y));
-        engine.generateAndProcessNextMove(game, moves);
+        engine.processAndGenerareteNextMove(game, moves);
         assertEquals(game.getStatus(), GameStatus.IN_PROGRESS);
         assertEquals(game.getWinner(), GameWinner.NOT_DEFINED_YET);
         assertEquals(game.getActiveTurn(), GameWinner.PLAYER);
@@ -66,7 +66,7 @@ public class BoardUtils {
                                               TictactoeGameEngine engine,
                                               int x, int y) {
         moves.add(createMove(x, y));
-        engine.generateAndProcessNextMove(game, moves);
+        engine.processAndGenerareteNextMove(game, moves);
         assertEquals(game.getStatus(), GameStatus.FINISHED);
         assertEquals(game.getWinner(), GameWinner.DRAW);
         assertNull(game.getActiveTurn());

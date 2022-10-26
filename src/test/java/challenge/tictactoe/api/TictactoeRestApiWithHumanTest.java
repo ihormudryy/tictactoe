@@ -7,6 +7,7 @@ import challenge.tictactoe.db.MoveEntity;
 import challenge.tictactoe.persistance.GameRepository;
 import challenge.tictactoe.persistance.MoveRepository;
 import challenge.utils.RestApiUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,10 @@ public class TictactoeRestApiWithHumanTest {
         moveRepository.deleteAll().block();
     }
 
+    @AfterEach
+    public void tearDown() {
+    }
+
     @Test
     void testFullLostGamePersonAgainstPerson() {
         List<List<Integer>> moves1 = List.of(
@@ -61,7 +66,6 @@ public class TictactoeRestApiWithHumanTest {
                 .jsonPath("$.activeTurn").isEqualTo(GameWinner.PLAYER_1)
                 .jsonPath("$.gameType").isEqualTo(GameType.AGAINST_HUMAN)
                 .jsonPath("$.id").value(id -> {
-
                     for (int i = 0; i < moves2.size(); i++) {
                         restApiUtils.makeMove(id.toString(),
                                         MoveEntity.builder()
@@ -77,7 +81,6 @@ public class TictactoeRestApiWithHumanTest {
                                 .jsonPath("$.activeTurn").isEqualTo(GameWinner.PLAYER_2)
                                 .jsonPath("$.gameType").isEqualTo(GameType.AGAINST_HUMAN)
                                 .jsonPath("$.moves.length()").isEqualTo(i * 2 + 1);
-
                         restApiUtils.makeMove(id.toString(),
                                         MoveEntity.builder()
                                                 .gameId(id.toString())

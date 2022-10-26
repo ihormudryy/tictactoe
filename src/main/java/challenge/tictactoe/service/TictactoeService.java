@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,8 +62,7 @@ public class TictactoeService {
                                 .build())
                 .map(gameMapper::dtoToEntity)
                 .doOnError(ex -> log.warn("createNewGame failed: {}", ex.toString()))
-                .doOnSuccess(e -> log.info("New game with type {} was created", gameType))
-                .log();
+                .doOnSuccess(e -> log.info("New game with type {} was created", gameType));
     }
 
     public Mono<Void> deleteGame(String gameId) {
@@ -71,8 +71,7 @@ public class TictactoeService {
                 .findByGameId(gameId)
                 .flatMap(move -> moveRepository.delete(move))
                 .then()
-                .doOnSuccess(e -> log.info("Moves from game {} deleted", gameId))
-                .log();
+                .doOnSuccess(e -> log.info("Moves from game {} deleted", gameId));
     }
 
     public Mono<GameDto> makeTictactoeMove(String gameId, MoveDto move) {
@@ -84,97 +83,54 @@ public class TictactoeService {
         return moveRepository
                 .findByGameId(gameId)
                 .concatMap(m -> {
+                    // If user tries to make a move with used coordinates
                     if (m.getX() == move.getX() && m.getY() == move.getY()) {
                         return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                 String.format(CELL_X_Y_IS_USED, m.getX(), m.getY())));
                     }
                     return Mono.just(m);
                 })
-                .collectList()
+                .collectSortedList(Comparator.comparing(MoveEntity::getNumber))
                 .zipWith(gameRepository.findById(gameId)
                         .switchIfEmpty(Mono.error(new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
                                 String.format(GAME_NOT_FOUND, gameId)))))
                 .flatMap(gameWithMoves -> {
                     GameEntity game = gameWithMoves.getT2();
-                    List<MoveEntity> moves = gameWithMoves.getT1();
-                    int size = gameWithMoves.getT1().size();
-
                     // If the game is over then stop processing the move
                     if (game.getStatus().equals(GameStatus.FINISHED)) {
                         return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                 GAME_IS_CLOSED));
                     }
-
                     // Create next move entity, set its properties and add to array of moves
+                    List<MoveEntity> moves = gameWithMoves.getT1();
                     MoveEntity moveEntity = moveMapper.dtoToEntity(move);
+                    int size = moves.size();
                     moveEntity.setGameId(gameId);
                     moveEntity.setNumber(size + 1);
-                    gameWithMoves.getT1().add(moveEntity);
-                    log.info("Game active move {}", game.getActiveTurn());
+                    moves.add(moveEntity);
                     // Process new move differently based on a game type
                     if (game.getGameType().equals(GameType.AGAINST_AI)) {
-                        // If this match is against AI then next move has to be processed by AI engine
-                        // and automatic answer move has to be produced by machine
-                        moveEntity.setPlayedBy(GameWinner.PLAYER);
-                        return moveRepository.insert(moveEntity)
-                                .onErrorStop()
-                                .doOnSuccess(e -> {
-                                    game.setActiveTurn(GameWinner.AI);
-                                    engineAgainstAi.generateAndProcessNextMove(game, moves);
-                                })
-                                .flatMap(e -> {
-                                    MoveEntity lastMove = moves.get(moves.size() - 1);
-                                    if (lastMove.getPlayedBy()
-                                            .equals(GameWinner.AI))
-                                        return moveRepository
-                                                .insert(lastMove)
-                                                .onErrorStop();
-                                    else
-                                        return Mono.just(gameId);
-                                }).flatMap(e -> moveRepository
-                                        .findByGameId(gameId)
-                                        .collectList()
-                                        .zipWith(gameRepository.save(game)));
+                        return processMoveWithAi(moveEntity, game, moves);
                     } else {
-                        // If this match is against person then simply save next move to DB
-                        // and update game properties accordingly
-                        if (size == 0) {
-                            moveEntity.setPlayedBy(GameWinner.PLAYER_1);
-                            game.setActiveTurn(GameWinner.PLAYER_2);
-                        } else {
-                            String lastPlayedBy = gameWithMoves.getT1().get(size - 1).getPlayedBy();
-                            String nextPlayer = lastPlayedBy.equals(GameWinner.PLAYER_1) ?
-                                    GameWinner.PLAYER_2 : GameWinner.PLAYER_1;
-                            moveEntity.setPlayedBy(nextPlayer);
-                            game.setActiveTurn(lastPlayedBy);
-                        }
-                        engineAgainstPerson.validateNextMove(game, moves);
-                        return moveRepository
-                                .insert(moveEntity)
-                                .onErrorStop()
-                                .flatMap(e -> moveRepository
-                                        .findByGameId(gameId)
-                                        .collectList()
-                                        .zipWith(gameRepository.save(game)));
+                        return processMoveWithOtherPlayer(moveEntity, game, moves, size);
                     }
                 })
                 .flatMap(gameWithMovesUpdated -> {
                     // Generate DTO to send it as HTTP response
-                    GameDto game = gameMapper.dtoToEntity(gameWithMovesUpdated.getT2());
-                    game.setMoves(gameWithMovesUpdated
-                            .getT1()
-                            .stream()
-                            .map(moveMapper::entityToDto)
-                            .sorted(Comparator.comparing(MoveDto::getNumber))
-                            .collect(toCollection(ArrayList::new)));
-                    return Mono.just(game);
+                    return createGameDto(gameWithMovesUpdated.getT2(),
+                            gameWithMovesUpdated.getT1());
                 })
-                .doOnSuccess(e -> log.info("Move x: {}, y: {} was successfully processed", move.getX(),
-                        move.getY()))
+                .doOnSuccess(e -> log.info("Move num: {} was successfully processed ", e.getMoves().size()))
                 .doOnError(e -> log.info("Failed to add next move x: {}, y: {}", move.getX(), move.getY()));
     }
 
+    /**
+     * Get game entry from DB by its id
+     *
+     * @param gameId
+     * @return
+     */
     public Mono<GameDto> getGame(String gameId) {
         return gameRepository.findById(gameId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -192,5 +148,87 @@ public class TictactoeService {
                     return gameWithMoves.getT1();
                 })
                 .doOnSuccess(e -> log.info("Game was found and fetched"));
+    }
+
+    /**
+     * If this match is against AI then next move has to be processed by AI engine
+     * and automatic answer move has to be produced by machine
+     *
+     * @param move
+     * @param game
+     * @param moves
+     * @return
+     */
+    private Mono<Tuple2<List<MoveEntity>, GameEntity>> processMoveWithAi(
+            MoveEntity move,
+            GameEntity game,
+            List<MoveEntity> moves) {
+
+        move.setPlayedBy(GameWinner.PLAYER);
+        return moveRepository.insert(move)
+                .onErrorStop()
+                .doOnSuccess(e -> {
+                    game.setActiveTurn(GameWinner.AI);
+                    engineAgainstAi.processAndGenerareteNextMove(game, moves);
+                })
+                .flatMap(e -> {
+                    MoveEntity lastMove = moves.get(moves.size() - 1);
+                    if (lastMove.getPlayedBy()
+                            .equals(GameWinner.AI))
+                        return moveRepository
+                                .insert(lastMove)
+                                .onErrorStop();
+                    else
+                        return Mono.just(game.getId());
+                }).flatMap(e -> moveRepository
+                        .findByGameId(game.getId())
+                        .collectList()
+                        .zipWith(gameRepository.save(game)));
+    }
+
+    /**
+     * If this match is against person then simply save next move to DB
+     * and update game properties accordingly
+     *
+     * @param move
+     * @param game
+     * @param moves
+     * @return
+     */
+    private Mono<Tuple2<List<MoveEntity>, GameEntity>> processMoveWithOtherPlayer(
+            MoveEntity move,
+            GameEntity game,
+            List<MoveEntity> moves,
+            int size) {
+
+        if (size == 0) {
+            move.setPlayedBy(GameWinner.PLAYER_1);
+            game.setActiveTurn(GameWinner.PLAYER_2);
+        } else {
+            String lastPlayedBy = moves.get(size - 1).getPlayedBy();
+            String nextPlayer = lastPlayedBy.equals(GameWinner.PLAYER_1) ?
+                    GameWinner.PLAYER_2 : GameWinner.PLAYER_1;
+
+            move.setPlayedBy(nextPlayer);
+            game.setActiveTurn(lastPlayedBy);
+        }
+
+        engineAgainstPerson.validateNextMove(game, moves);
+        return moveRepository
+                .insert(move)
+                .onErrorStop()
+                .flatMap(e -> moveRepository
+                        .findByGameId(game.getId())
+                        .collectList())
+                .zipWith(gameRepository.save(game));
+    }
+
+    private Mono<GameDto> createGameDto(GameEntity gameEntity, List<MoveEntity> moves) {
+        GameDto game = gameMapper.dtoToEntity(gameEntity);
+        game.setMoves(moves.stream()
+                .map(moveMapper::entityToDto)
+                .sorted(Comparator.comparing(MoveDto::getNumber))
+                .collect(toCollection(ArrayList::new)));
+        return Mono.just(game);
     }
 }

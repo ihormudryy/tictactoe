@@ -28,7 +28,7 @@ public class Cli {
             MoveEntity move = createMove(Integer.parseInt(coordinates[0]),
                     Integer.parseInt(coordinates[1]));
             moves.add(move);
-            tictactoeGameEngine.generateAndProcessNextMove(game, moves);
+            tictactoeGameEngine.processAndGenerareteNextMove(game, moves);
             int[][] matrix = new int[3][3];
             moves.forEach(e -> getMoveOwner(matrix, e));
             for (int i = 0; i < matrix.length; i++) {

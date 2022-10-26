@@ -65,7 +65,7 @@ class TictactoeGameEngineTest {
     void testDrawMatchWhenAiStartsFirst() {
         GameEntity game = createNewGame();
         List<MoveEntity> moves = new ArrayList<>();
-        tictactoeGameEngine.generateAndProcessNextMove(game, moves);
+        tictactoeGameEngine.processAndGenerareteNextMove(game, moves);
         Assertions.assertEquals(game.getStatus(), GameStatus.IN_PROGRESS);
         Assertions.assertEquals(game.getWinner(), GameWinner.NOT_DEFINED_YET);
         makeIntermediateMoveAndAssert(moves, game, tictactoeGameEngine, 1, 1);
@@ -86,7 +86,7 @@ class TictactoeGameEngineTest {
         makeIntermediateMoveAndAssert(moves, game, tictactoeGameEngine, 2, 2);
         makeIntermediateMoveAndAssert(moves, game, tictactoeGameEngine, 0, 2);
         moves.add(createMove(0, 0));
-        tictactoeGameEngine.generateAndProcessNextMove(game, moves);
+        tictactoeGameEngine.processAndGenerareteNextMove(game, moves);
         assertEquals(game.getStatus(), GameStatus.FINISHED);
         assertEquals(game.getWinner(), GameWinner.AI);
     }
@@ -101,12 +101,12 @@ class TictactoeGameEngineTest {
     void testLostMatchInThreeMovesWhenAiStartsFirst() {
         GameEntity game = createNewGame();
         List<MoveEntity> moves = new ArrayList<>();
-        tictactoeGameEngine.generateAndProcessNextMove(game, moves);
+        tictactoeGameEngine.processAndGenerareteNextMove(game, moves);
         assertEquals(game.getStatus(), GameStatus.IN_PROGRESS);
         assertEquals(game.getWinner(), GameWinner.NOT_DEFINED_YET);
         makeIntermediateMoveAndAssert(moves, game, tictactoeGameEngine, 2, 2);
         moves.add(createMove(1, 2));
-        tictactoeGameEngine.generateAndProcessNextMove(game, moves);
+        tictactoeGameEngine.processAndGenerareteNextMove(game, moves);
         assertEquals(game.getStatus(), GameStatus.FINISHED);
         assertEquals(game.getWinner(), GameWinner.AI);
     }
@@ -117,7 +117,7 @@ class TictactoeGameEngineTest {
         GameEntity gameAi2 = createNewGame();
         List<MoveEntity> movesAi1 = new ArrayList<>();
         List<MoveEntity> movesAi2 = new ArrayList<>();
-        tictactoeGameEngine.generateAndProcessNextMove(gameAi1, movesAi1);
+        tictactoeGameEngine.processAndGenerareteNextMove(gameAi1, movesAi1);
         assertEquals(gameAi1.getStatus(), GameStatus.IN_PROGRESS);
         assertEquals(gameAi1.getWinner(), GameWinner.NOT_DEFINED_YET);
         while (!gameAi2.getStatus().equals(GameStatus.FINISHED)) {
@@ -148,7 +148,7 @@ class TictactoeGameEngineTest {
             List<MoveEntity> movesAi2 = new ArrayList<>();
 
             long start = System.nanoTime();
-            tictactoeGameEngine.generateAndProcessNextMove(gameAi1, movesAi1);
+            tictactoeGameEngine.processAndGenerareteNextMove(gameAi1, movesAi1);
             long finish = System.nanoTime();
             addValueToList(finish - start, level, timeProbes);
             while (!gameAi2.getStatus().equals(GameStatus.FINISHED)) {
