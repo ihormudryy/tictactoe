@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class BoardUtils {
 
-    public static int setMoveOwner(int[][] mat, MoveEntity move) {
+    public static int getMoveOwner(int[][] mat, MoveEntity move) {
         return mat[move.getX()][move.getY()] = move
                 .getPlayedBy()
                 .equals(GameWinner.PLAYER) ? 1 : 2;

@@ -8,6 +8,7 @@ import challenge.tictactoe.db.MoveEntity;
 import challenge.tictactoe.persistance.GameRepository;
 import challenge.tictactoe.persistance.MoveRepository;
 import challenge.utils.RestApiUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import static org.springframework.http.HttpStatus.OK;
         properties = {"spring.main.allow-bean-definition-overriding=true"})
 @ActiveProfiles("test")
 @Tag("rest-api-test")
+@Slf4j
 class TictactoeRestApiWithAiTest {
 
     @Autowired

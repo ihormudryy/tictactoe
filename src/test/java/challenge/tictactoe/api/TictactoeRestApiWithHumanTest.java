@@ -4,6 +4,8 @@ import challenge.tictactoe.constant.GameStatus;
 import challenge.tictactoe.constant.GameType;
 import challenge.tictactoe.constant.GameWinner;
 import challenge.tictactoe.db.MoveEntity;
+import challenge.tictactoe.persistance.GameRepository;
+import challenge.tictactoe.persistance.MoveRepository;
 import challenge.utils.RestApiUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -29,13 +31,22 @@ public class TictactoeRestApiWithHumanTest {
     WebTestClient client;
     RestApiUtils restApiUtils;
 
+    @Autowired
+    private GameRepository gameRepository;
+
+    @Autowired
+    private MoveRepository moveRepository;
+
     @BeforeEach
     public void init() {
+
         restApiUtils = new RestApiUtils(client);
+        gameRepository.deleteAll().block();
+        moveRepository.deleteAll().block();
     }
 
     @Test
-    void testFullDrawGamePersonAgainstPerson() {
+    void testFullLostGamePersonAgainstPerson() {
         List<List<Integer>> moves1 = List.of(
                 List.of(1, 1),
                 List.of(1, 0),
@@ -101,7 +112,7 @@ public class TictactoeRestApiWithHumanTest {
 
 
     @Test
-    void testLostGamePersonAgainstPerson() {
+    void testDrawGamePersonAgainstPerson() {
         List<List<Integer>> moves1 = List.of(
                 List.of(1, 1),
                 List.of(0, 1),

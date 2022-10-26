@@ -101,8 +101,7 @@ public class TictactoeService {
                     int size = gameWithMoves.getT1().size();
 
                     // If the game is over then stop processing the move
-                    if (game.getStatus()
-                            .equals(GameStatus.FINISHED)) {
+                    if (game.getStatus().equals(GameStatus.FINISHED)) {
                         return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                 GAME_IS_CLOSED));
                     }
@@ -112,14 +111,31 @@ public class TictactoeService {
                     moveEntity.setGameId(gameId);
                     moveEntity.setNumber(size + 1);
                     gameWithMoves.getT1().add(moveEntity);
-
+                    log.info("Game active move {}", game.getActiveTurn());
                     // Process new move differently based on a game type
                     if (game.getGameType().equals(GameType.AGAINST_AI)) {
                         // If this match is against AI then next move has to be processed by AI engine
                         // and automatic answer move has to be produced by machine
                         moveEntity.setPlayedBy(GameWinner.PLAYER);
-                        game.setActiveTurn(GameWinner.AI);
-                        engineAgainstAi.generateAndProcessNextMove(game, moves);
+                        return moveRepository.insert(moveEntity)
+                                .onErrorStop()
+                                .doOnSuccess(e -> {
+                                    game.setActiveTurn(GameWinner.AI);
+                                    engineAgainstAi.generateAndProcessNextMove(game, moves);
+                                })
+                                .flatMap(e -> {
+                                    MoveEntity lastMove = moves.get(moves.size() - 1);
+                                    if (lastMove.getPlayedBy()
+                                            .equals(GameWinner.AI))
+                                        return moveRepository
+                                                .insert(lastMove)
+                                                .onErrorStop();
+                                    else
+                                        return Mono.just(gameId);
+                                }).flatMap(e -> moveRepository
+                                        .findByGameId(gameId)
+                                        .collectList()
+                                        .zipWith(gameRepository.save(game)));
                     } else {
                         // If this match is against person then simply save next move to DB
                         // and update game properties accordingly
@@ -134,29 +150,29 @@ public class TictactoeService {
                             game.setActiveTurn(lastPlayedBy);
                         }
                         engineAgainstPerson.validateNextMove(game, moves);
+                        return moveRepository
+                                .insert(moveEntity)
+                                .onErrorStop()
+                                .flatMap(e -> moveRepository
+                                        .findByGameId(gameId)
+                                        .collectList()
+                                        .zipWith(gameRepository.save(game)));
                     }
-
-                    return Mono.zip(
-                            gameRepository.save(game),
-                            moveRepository
-                                    .saveAll(moves)
-                                    .collectList()
-                                    .log()
-                    );
                 })
                 .flatMap(gameWithMovesUpdated -> {
                     // Generate DTO to send it as HTTP response
-                    GameDto game = gameMapper.dtoToEntity(gameWithMovesUpdated.getT1());
+                    GameDto game = gameMapper.dtoToEntity(gameWithMovesUpdated.getT2());
                     game.setMoves(gameWithMovesUpdated
-                            .getT2()
+                            .getT1()
                             .stream()
                             .map(moveMapper::entityToDto)
                             .sorted(Comparator.comparing(MoveDto::getNumber))
                             .collect(toCollection(ArrayList::new)));
                     return Mono.just(game);
                 })
-                .doOnSuccess(e -> log.info("Move was successfully processed"))
-                .doOnError(e -> log.info("Failed to add next move"));
+                .doOnSuccess(e -> log.info("Move x: {}, y: {} was successfully processed", move.getX(),
+                        move.getY()))
+                .doOnError(e -> log.info("Failed to add next move x: {}, y: {}", move.getX(), move.getY()));
     }
 
     public Mono<GameDto> getGame(String gameId) {

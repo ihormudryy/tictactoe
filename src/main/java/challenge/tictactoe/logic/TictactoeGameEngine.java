@@ -128,6 +128,8 @@ public class TictactoeGameEngine {
                     nextMoves.add(move);
                 });
 
+        if (scores.size() == 0) return 0;
+
         if (playerName.equals(SECOND_PLAYER)) {
             int maxScoreIndex = scores.indexOf(Collections.max(scores));
             moves.add(nextMoves.get(maxScoreIndex));

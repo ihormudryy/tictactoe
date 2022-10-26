@@ -24,5 +24,4 @@ public class MoveDto {
     int number;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     String playedBy;
-
 }
